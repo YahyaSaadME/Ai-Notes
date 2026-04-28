@@ -42,6 +42,22 @@ docker build -t ai-notes .
 docker run --rm -p 3000:3000 --env-file .env.local ai-notes
 ```
 
+If MongoDB is running on your host machine, override the database URL when starting the container:
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env.local -e MONGODB_URI=mongodb://host.docker.internal:27017/notes ai-notes
+```
+
+### Run locally with Docker Compose
+
+This repo includes a `docker-compose.yml` that starts both the app and MongoDB together:
+
+```bash
+docker compose up --build
+```
+
+The app will be available at `http://localhost:3000` and will connect to MongoDB using the internal Docker hostname `mongo`.
+
 ### Deploy on Render
 
 1. Push the repository to GitHub.

@@ -1,0 +1,39 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: ai-notes-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-notes-app
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - .env.local
+    environment:
+      DOCKER_ENV: "true"
+      MONGODB_URI: mongodb://mongo:27017/notes
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads_data:/app/public/uploads
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  uploads_data:

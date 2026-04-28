@@ -1,9 +1,22 @@
 import mongoose from 'mongoose'
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/caddb'
+function getMongoUri() {
+  const defaultMongoUri =
+    process.env.DOCKER_ENV === 'true'
+      ? 'mongodb://mongo:27017/notes'
+      : process.env.NODE_ENV !== 'production'
+        ? 'mongodb://127.0.0.1:27017/notes'
+        : ''
 
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env.local')
+  const mongoUri = process.env.MONGODB_URI || defaultMongoUri
+
+  if (!mongoUri) {
+    throw new Error(
+      'MONGODB_URI is required in production. Configure it in your hosting provider environment variables.'
+    )
+  }
+
+  return mongoUri
 }
 
 interface GlobalMongoose {
@@ -29,9 +42,10 @@ async function connectDB() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 5000,
     }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts)
+    cached.promise = mongoose.connect(getMongoUri(), opts)
   }
 
   try {

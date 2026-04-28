@@ -80,6 +80,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const [showTranscriptionBox, setShowTranscriptionBox] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [assigneeFilterInput, setAssigneeFilterInput] = useState("");
+  const [tagsFilterInput, setTagsFilterInput] = useState("");
 
   useEffect(() => {
     fetchUser();
@@ -88,6 +89,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   useEffect(() => {
     if (pathname.startsWith("/notes")) {
       setAssigneeFilterInput(searchParams.get("assignee") || "");
+      setTagsFilterInput(searchParams.get("tags") || "");
     }
   }, [pathname, searchParams]);
 
@@ -295,17 +297,26 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const clearSidebarFilters = () => {
     updateNotesFilters({
-      workflowStatus: "",
-      visibility: "",
+      type: "",
       completed: "",
       prioritize: "",
+      tags: "",
+      date: "",
+      deadline: "",
+      sortBy: "",
+      sortOrder: "",
       assignee: "",
     });
     setAssigneeFilterInput("");
+    setTagsFilterInput("");
   };
 
   const applyAssigneeFilter = () => {
     updateNotesFilters({ assignee: assigneeFilterInput.trim() });
+  };
+
+  const applyTagsFilter = () => {
+    updateNotesFilters({ tags: tagsFilterInput.trim() });
   };
 
   return (
@@ -381,29 +392,17 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         {pathname.startsWith("/notes") && !isCollapsed && (
           <div className="p-3 border-b border-zinc-800 space-y-2">
             <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
-              Sidebar Filters
+              Note Filters
             </p>
 
             <select
-              value={searchParams.get("workflowStatus") || ""}
-              onChange={(event) => updateNotesFilters({ workflowStatus: event.target.value })}
+              value={searchParams.get("type") || ""}
+              onChange={(event) => updateNotesFilters({ type: event.target.value })}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
             >
-              <option value="">Any Workflow Stage</option>
-              <option value="backlog">Backlog</option>
-              <option value="in_progress">In Progress</option>
-              <option value="review">Review</option>
-              <option value="done">Done</option>
-            </select>
-
-            <select
-              value={searchParams.get("visibility") || ""}
-              onChange={(event) => updateNotesFilters({ visibility: event.target.value })}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
-            >
-              <option value="">Any Visibility</option>
-              <option value="org">Organization</option>
-              <option value="private">Private</option>
+              <option value="">All Note Types</option>
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
             </select>
 
             <select
@@ -429,6 +428,41 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
             <div className="flex items-center gap-2">
               <input
                 type="text"
+                value={tagsFilterInput}
+                onChange={(event) => setTagsFilterInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    applyTagsFilter();
+                  }
+                }}
+                placeholder="Tags, comma separated"
+                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+              />
+              <button
+                onClick={applyTagsFilter}
+                className="rounded-lg border border-zinc-600 bg-black px-2 py-2 text-[11px] text-zinc-200"
+              >
+                Apply
+              </button>
+            </div>
+
+            <input
+              type="date"
+              value={searchParams.get("date") || ""}
+              onChange={(event) => updateNotesFilters({ date: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            />
+
+            <input
+              type="date"
+              value={searchParams.get("deadline") || ""}
+              onChange={(event) => updateNotesFilters({ deadline: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            />
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
                 value={assigneeFilterInput}
                 onChange={(event) => setAssigneeFilterInput(event.target.value)}
                 onKeyDown={(event) => {
@@ -445,6 +479,28 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               >
                 Apply
               </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={searchParams.get("sortBy") || "createdAt"}
+                onChange={(event) => updateNotesFilters({ sortBy: event.target.value })}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+              >
+                <option value="createdAt">Newest</option>
+                <option value="updatedAt">Recently Updated</option>
+                <option value="deadline">Deadline</option>
+                <option value="title">Title</option>
+              </select>
+
+              <select
+                value={searchParams.get("sortOrder") || "desc"}
+                onChange={(event) => updateNotesFilters({ sortOrder: event.target.value })}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+              >
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </select>
             </div>
 
             <button

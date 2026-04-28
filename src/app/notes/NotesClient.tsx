@@ -508,8 +508,8 @@ const Notespage = () => {
     const params = new URLSearchParams(searchParams.toString());
     
     const initialSearch = params.get('search') || '';
-    const initialType = params.get('type') || 'work';
-    const initialCompleted = params.get('completed') || 'false';
+    const initialType = params.get('type') || '';
+    const initialCompleted = params.get('completed') || '';
     const initialPrioritize = params.get('prioritize') || '';
     const initialTags = params.get('tags') || '';
     const initialDate = params.get('date') || '';
