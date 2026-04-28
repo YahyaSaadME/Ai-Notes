@@ -1,6 +1,6 @@
 'use client'
 import Sidebar from './Sidebar'
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -25,12 +25,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [])
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+    <div className="flex min-h-screen bg-black text-white">
+      <Suspense fallback={null}>
+        <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+      </Suspense>
       <div className={`flex-1 transition-all duration-300 min-h-screen ${
         isCollapsed ? 'ml-16' : 'ml-16 lg:ml-64'
       }`}>
-        <main className="p-8 bg-white min-h-screen">
+        <main className="p-8 bg-black min-h-screen">
           {children}
         </main>
       </div>

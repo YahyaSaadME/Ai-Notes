@@ -1,6 +1,6 @@
-# CAD Dashboard with Projects Management
+# AI Notes
 
-A Next.js application with Mongoose/MongoDB for managing CAD projects and file uploads.
+A Next.js application with MongoDB for role-based notes, collaboration, and AI-assisted note generation.
 
 ## Features
 
@@ -62,6 +62,27 @@ yarn dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000) to see the application.
+
+### Docker / Render Deployment
+
+This repo includes a Dockerfile and `render.yaml`.
+
+Local Docker run:
+
+```bash
+docker build -t ai-notes .
+docker run --rm -p 3000:3000 --env-file .env.local ai-notes
+```
+
+On Render, create a Web Service from this repository and configure:
+
+- `MONGODB_URI`
+- `JWT_SECRET`
+- `NEXT_PUBLIC_ADMIN_EMAIL`
+- `NEXT_PUBLIC_ADMIN_PASS`
+- `GROQ_API_KEY` if you use the AI features
+
+The service expects a persistent disk mounted at `/var/data/uploads`, and uploaded files are read from `UPLOADS_DIR`.
 
 ## File Structure
 

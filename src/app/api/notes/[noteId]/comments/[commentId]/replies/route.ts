@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '../../../../../../../lib/mongodb'
 import Note from '../../../../../../../models/Note'
 import { verifyToken } from '../../../../../../../lib/auth'
+import { getNoteUpdateScope } from '@/lib/rbac'
+
+function scopedQuery(noteId: string, scope: Record<string, unknown>) {
+  if (Object.keys(scope).length === 0) {
+    return { _id: noteId }
+  }
+
+  return {
+    $and: [
+      { _id: noteId },
+      scope,
+    ],
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -21,19 +35,21 @@ export async function POST(
     await connectDB()
 
     const { noteId, commentId } = await params
+    const updateScope = getNoteUpdateScope(payload)
+
+    if (!updateScope) {
+      return NextResponse.json({ error: 'Role is not allowed to add replies' }, { status: 403 })
+    }
 
     const body = await request.json()
-    const { text, isPrivate } = body
+    const { text, isPrivate, privateUsers } = body
 
     if (!text || !text.trim()) {
       return NextResponse.json({ error: 'Reply text is required' }, { status: 400 })
     }
 
     // Check if note exists and belongs to user
-    const note = await Note.findOne({
-      _id: noteId,
-      createdby: payload.email
-    })
+    const note = await Note.findOne(scopedQuery(noteId, updateScope))
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })
@@ -49,6 +65,9 @@ export async function POST(
       text: text.trim(),
       createdBy: payload.email,
       isPrivate: Boolean(isPrivate),
+      privateUsers: Array.isArray(privateUsers)
+        ? privateUsers.map((user: string) => String(user).trim().toLowerCase()).filter(Boolean)
+        : [],
       replies: []
     }
 

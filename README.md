@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Notes
+
+AI Notes is a Next.js app for role-based note management, collaboration, and AI-assisted note generation.
 
 ## Getting Started
 
@@ -29,8 +31,29 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Docker and Render
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This project now ships with a Dockerfile and a Render blueprint so it can run the same way locally and in production.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Build and run locally with Docker
+
+```bash
+docker build -t ai-notes .
+docker run --rm -p 3000:3000 --env-file .env.local ai-notes
+```
+
+### Deploy on Render
+
+1. Push the repository to GitHub.
+2. Create a new Render Web Service from this repo.
+3. Render will detect `render.yaml` and use the included Dockerfile.
+4. Set the required environment variables in Render:
+	- `MONGODB_URI`
+	- `JWT_SECRET`
+	- `NEXT_PUBLIC_ADMIN_EMAIL`
+	- `NEXT_PUBLIC_ADMIN_PASS`
+	- `GROQ_API_KEY` if you use the AI features
+	- `TNGIS_COOKIE`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` if those features are enabled
+5. Keep the persistent disk mounted at `/var/data/uploads` so uploaded files survive redeploys.
+
+The file-serving route reads from `UPLOADS_DIR`. It defaults to `public/uploads` locally and is set to `/var/data/uploads` on Render.

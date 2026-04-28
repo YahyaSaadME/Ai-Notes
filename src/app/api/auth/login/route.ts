@@ -6,18 +6,19 @@ import { comparePassword, createToken, isAdmin } from '@/lib/auth'
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
+    const normalizedEmail = String(email || '').trim().toLowerCase()
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
 
     // Check if admin login
-    if (isAdmin(email, password)) {
-      const token = createToken({ email, role: 'admin', name: 'Administrator' })
+    if (isAdmin(normalizedEmail, password)) {
+      const token = createToken({ email: normalizedEmail, role: 'admin', name: 'Administrator' })
       
       const response = NextResponse.json({ 
         success: true, 
-        user: { email, role: 'admin', name: 'Administrator' }
+        user: { email: normalizedEmail, role: 'admin', name: 'Administrator' }
       })
       
       response.cookies.set('auth-token', token, {
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Check user login
     await connectDB()
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email: normalizedEmail })
 
     if (!user || !(await comparePassword(password, user.password))) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
     const token = createToken({ 
       userId: user._id.toString(), 
       email: user.email, 
-      role: 'user',
+      role: user.role || 'operator',
       name: user.name 
     })
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         id: user._id, 
         email: user.email, 
         name: user.name, 
-        role: 'user' 
+        role: user.role || 'operator' 
       }
     })
 

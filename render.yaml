@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: dbms
+    env: docker
+    plan: starter
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: UPLOADS_DIR
+        value: /var/data/uploads
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_ADMIN_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_ADMIN_PASS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TNGIS_COOKIE
+        sync: false
+      - key: NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false
+    disk:
+      name: uploads
+      mountPath: /var/data/uploads
+      sizeGB: 1

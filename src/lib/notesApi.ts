@@ -1,6 +1,15 @@
 // API functions for Notes and Comments system
 
-import { Note, Comment, CreateNoteData, UpdateNoteData, CreateCommentData, UpdateCommentData, NotesFilters, NotesResponse } from '@/types/notes'
+import {
+  Comment,
+  CreateCommentData,
+  CreateNoteData,
+  Note,
+  NotesFilters,
+  NotesResponse,
+  UpdateCommentData,
+  UpdateNoteData,
+} from '@/types/notes'
 
 const API_BASE = '/api'
 
@@ -59,6 +68,9 @@ export const notesApi = {
     if (filters.tags) params.append('tags', filters.tags)
     if (filters.date) params.append('date', filters.date)
     if (filters.deadline) params.append('deadline', filters.deadline)
+    if (filters.workflowStatus) params.append('workflowStatus', filters.workflowStatus)
+    if (filters.visibility) params.append('visibility', filters.visibility)
+    if (filters.assignee) params.append('assignee', filters.assignee)
     params.append('sortBy', filters.sortBy)
     params.append('sortOrder', filters.sortOrder)
     params.append('page', (filters.page || 1).toString())

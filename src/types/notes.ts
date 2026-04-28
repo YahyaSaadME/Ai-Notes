@@ -17,6 +17,9 @@ export interface Note {
   type: 'work' | 'personal'
   completed: boolean
   prioritize: boolean
+  workflowStatus?: 'backlog' | 'in_progress' | 'review' | 'done'
+  visibility?: 'org' | 'private'
+  assignedTo?: string
   deadline?: string
   tags: string[]
   createdby: string
@@ -32,6 +35,9 @@ export interface CreateNoteData {
   deadline?: string
   tags: string
   prioritize: boolean
+  workflowStatus?: 'backlog' | 'in_progress' | 'review' | 'done'
+  visibility?: 'org' | 'private'
+  assignedTo?: string
 }
 
 export interface UpdateNoteData {
@@ -42,6 +48,9 @@ export interface UpdateNoteData {
   prioritize?: boolean
   deadline?: string
   tags?: string[]
+  workflowStatus?: 'backlog' | 'in_progress' | 'review' | 'done'
+  visibility?: 'org' | 'private'
+  assignedTo?: string
 }
 
 export interface CreateCommentData {
@@ -66,6 +75,9 @@ export interface NotesFilters {
   tags?: string
   date?: string
   deadline?: string
+  workflowStatus?: string
+  visibility?: string
+  assignee?: string
   page?: number
   limit?: number
 }

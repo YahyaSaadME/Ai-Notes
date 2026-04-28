@@ -1,14 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
-import { hashPassword } from '@/lib/auth'
+import { hashPassword, normalizeRole, verifyToken } from '@/lib/auth'
+import { canAccessAdminPanel, roleOf } from '@/lib/rbac'
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json()
+    const token = request.cookies.get('auth-token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    if (!name || !email || !password) {
+    const payload = verifyToken(token)
+    if (!payload || !canAccessAdminPanel(payload)) {
+      return NextResponse.json({ error: 'Admin or manager access required' }, { status: 403 })
+    }
+
+    const { name, email, password, role } = await request.json()
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    const requestedRole = normalizeRole(role)
+    const actorRole = roleOf(payload)
+
+    const assignableByActor: Record<string, string[]> = {
+      admin: ['admin', 'owner', 'manager', 'operator', 'viewer'],
+      owner: ['manager', 'operator', 'viewer'],
+      manager: ['operator', 'viewer'],
+    }
+
+    if (!name || !normalizedEmail || !password) {
       return NextResponse.json({ error: 'All fields required' }, { status: 400 })
+    }
+
+    if (!assignableByActor[actorRole]?.includes(requestedRole)) {
+      return NextResponse.json({ error: 'You cannot assign this role' }, { status: 403 })
     }
 
     if (password.length < 6) {
@@ -18,7 +42,7 @@ export async function POST(request: NextRequest) {
     await connectDB()
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email })
+    const existingUser = await User.findOne({ email: normalizedEmail })
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists' }, { status: 400 })
     }
@@ -27,8 +51,9 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password)
     const user = await User.create({
       name,
-      email,
-      password: hashedPassword
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: requestedRole,
     })
 
     return NextResponse.json({ 

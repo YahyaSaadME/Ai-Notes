@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-})
-
 export async function POST(request: NextRequest) {
   try {
     const { transcription, type = 'personal' } = await request.json()
@@ -85,6 +81,14 @@ Transcription: "${transcription}"
 
 Return ONLY valid JSON array of note objects. Each note must have: title, description, type, deadline, prioritize, tags.
 `
+    const groqApiKey = process.env.GROQ_API_KEY
+    if (!groqApiKey) {
+      return NextResponse.json({ error: 'GROQ_API_KEY is not configured' }, { status: 500 })
+    }
+
+    const groq = new Groq({
+      apiKey: groqApiKey,
+    })
 
     const completion = await groq.chat.completions.create({
       messages: [{ role: 'user', content: noteGenerationPrompt }],

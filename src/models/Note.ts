@@ -19,7 +19,12 @@ const commentSchema = new mongoose.Schema({
   isPrivate: {
     type: Boolean,
     default: false
-  }
+  },
+  privateUsers: [{
+    type: String,
+    lowercase: true,
+    trim: true,
+  }]
 }, { _id: true })
 
 // Add replies as an array of subdocuments of the same schema
@@ -62,6 +67,21 @@ const noteSchema = new mongoose.Schema({
     enum: ['work', 'personal'],
     required: true
   },
+  workflowStatus: {
+    type: String,
+    enum: ['backlog', 'in_progress', 'review', 'done'],
+    default: 'backlog'
+  },
+  visibility: {
+    type: String,
+    enum: ['org', 'private'],
+    default: 'org'
+  },
+  assignedTo: {
+    type: String,
+    lowercase: true,
+    trim: true
+  },
   tags: [{
     type: String,
     trim: true,
@@ -77,6 +97,8 @@ noteSchema.index({ createdby: 1, type: 1 })
 noteSchema.index({ createdby: 1, completed: 1 })
 noteSchema.index({ createdby: 1, prioritize: 1 })
 noteSchema.index({ createdby: 1, tags: 1 })
+noteSchema.index({ assignedTo: 1, workflowStatus: 1 })
+noteSchema.index({ visibility: 1, createdAt: -1 })
 
 const Note = mongoose.models.Note || mongoose.model('Note', noteSchema)
 

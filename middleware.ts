@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from './src/lib/auth'
+import { canAccessAdminPanel } from './src/lib/rbac'
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value
@@ -20,13 +21,13 @@ export function middleware(request: NextRequest) {
     }
     
     const payload = verifyToken(token)
-    if (!payload || payload.role !== 'admin') {
+    if (!payload || !canAccessAdminPanel(payload)) {
       return NextResponse.redirect(new URL('/admin/login', request.url))
     }
   }
 
   // Check if trying to access user routes
-  if (pathname.startsWith('/profile')) {
+  if (pathname.startsWith('/profile') || pathname.startsWith('/notes')) {
     if (!token) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
@@ -41,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/profile/:path*', '/login', '/admin/login']
+  matcher: ['/admin/:path*', '/profile/:path*', '/notes/:path*', '/login', '/admin/login']
 }

@@ -1,11 +1,10 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Menu,
   X,
   Users,
-  User,
   LogOut,
   NotebookPen,
   BotOff,
@@ -13,17 +12,53 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
+interface SpeechRecognitionAlternativeLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternativeLike;
+}
+
+interface SpeechRecognitionResultListLike {
+  length: number;
+  [index: number]: SpeechRecognitionResultLike;
+}
+
+interface SpeechRecognitionEventLike {
+  resultIndex: number;
+  results: SpeechRecognitionResultListLike;
+}
+
+interface SpeechRecognitionErrorEventLike {
+  error: string;
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
   }
 }
 
 interface User {
   email: string;
   name: string;
-  role: "admin" | "user";
+  role: "admin" | "owner" | "manager" | "operator" | "viewer" | "user";
 }
 
 interface SidebarProps {
@@ -33,21 +68,28 @@ interface SidebarProps {
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [transcribedText, setTranscribedText] = useState("");
-  const [interimTranscript, setInterimTranscript] = useState("");
-  const [recognition, setRecognition] = useState<any>(null);
+  const [recognition, setRecognition] = useState<SpeechRecognitionLike | null>(null);
   const finalTranscriptsRef = useRef<string[]>([]);
   const [showTranscriptionBox, setShowTranscriptionBox] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [assigneeFilterInput, setAssigneeFilterInput] = useState("");
 
   useEffect(() => {
     fetchUser();
   }, []);
+
+  useEffect(() => {
+    if (pathname.startsWith("/notes")) {
+      setAssigneeFilterInput(searchParams.get("assignee") || "");
+    }
+  }, [pathname, searchParams]);
 
   const fetchUser = async () => {
     try {
@@ -92,7 +134,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = "en-US";
-        rec.onresult = (event: any) => {
+        rec.onresult = (event: SpeechRecognitionEventLike) => {
           const newFinals: string[] = [];
           let currentInterim = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -107,14 +149,13 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
             ...finalTranscriptsRef.current,
             ...newFinals,
           ];
-          setInterimTranscript(currentInterim);
           const fullText =
             finalTranscriptsRef.current.join(" ") +
             (currentInterim ? " " + currentInterim : "");
           setTranscribedText(fullText);
         };
         rec.onend = () => setIsRecording(false);
-        rec.onerror = (event: any) => {
+        rec.onerror = (event: SpeechRecognitionErrorEventLike) => {
           console.error("Speech recognition error:", event.error);
           setIsRecording(false);
         };
@@ -145,7 +186,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       }, 500); // Small delay to ensure transcription is complete
     } else {
       finalTranscriptsRef.current = [];
-      setInterimTranscript("");
       setTranscribedText("");
       setShowTranscriptionBox(true);
       recognition.start();
@@ -220,7 +260,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       // { href: "/login", label: "Login", icon: LogOut },
     ];
 
-    if (user?.role === "admin") {
+    if (user && ["admin", "owner", "manager"].includes(user.role)) {
       return [
         { href: "/notes", label: "Notes", icon: NotebookPen },
         { href: "/admin/home", label: "Manage Users", icon: Users },
@@ -235,21 +275,54 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const navItems = getNavItems();
 
+  const updateNotesFilters = (updates: Record<string, string>) => {
+    if (!pathname.startsWith("/notes")) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+
+    params.delete("page");
+    const query = params.toString();
+    router.replace(query ? `/notes?${query}` : "/notes", { scroll: false });
+  };
+
+  const clearSidebarFilters = () => {
+    updateNotesFilters({
+      workflowStatus: "",
+      visibility: "",
+      completed: "",
+      prioritize: "",
+      assignee: "",
+    });
+    setAssigneeFilterInput("");
+  };
+
+  const applyAssigneeFilter = () => {
+    updateNotesFilters({ assignee: assigneeFilterInput.trim() });
+  };
+
   return (
     <>
       <div
         className={`${
           isCollapsed ? "w-16" : "w-64"
-        } bg-white border-r border-gray-200 transition-all duration-300 shadow-sm fixed h-screen flex flex-col`}
+        } bg-black border-r border-zinc-800 transition-all duration-300 fixed h-screen flex flex-col`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
           {!isCollapsed && (
-            <h1 className="text-xl font-bold text-gray-800">AI Notes</h1>
+            <h1 className="text-xl font-bold text-white">AI Notes</h1>
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+            className="p-2 rounded-lg hover:bg-zinc-900 text-zinc-300"
           >
             {isCollapsed ? <Menu size={20} /> : <X size={20} />}
           </button>
@@ -259,28 +332,24 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         {/* User Info */}
 
 {user && !loading && (
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-zinc-800">
             {!isCollapsed && (
               <div className="flex justify-between items-start">
                 <div className="text-sm">
-                  <p className="font-medium text-gray-800 truncate">
+                  <p className="font-medium text-white truncate">
                     {user.name}
                   </p>
-                  <p className="text-gray-500 truncate">{user.email}</p>
+                  <p className="text-zinc-400 truncate">{user.email}</p>
                   <span
-                    className={`inline-block px-2 py-1 text-xs rounded-full mt-2 ${
-                      user.role === "admin"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-blue-100 text-blue-800"
-                    }`}
+                    className="inline-block px-2 py-1 text-xs rounded-full mt-2 border border-zinc-700 text-zinc-200"
                   >
                     {user.role.toUpperCase()}
                   </span>
                 </div>
                 <button
                   onClick={toggleRecording}
-                  className={`flex items-center p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors ${
-                    isRecording ? "text-red-600 bg-red-50" : "text-blue-600 bg-blue-50"
+                  className={`flex items-center p-3 rounded-lg border border-zinc-700 bg-zinc-950 hover:bg-zinc-900 transition-colors ${
+                    isRecording ? "text-white" : "text-zinc-300"
                   } ${isCollapsed ? "justify-center" : ""}`}
                   title={isCollapsed ? "AI Assistant" : ""}
                 >
@@ -291,16 +360,14 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
             {isCollapsed && (
               <div className="flex justify-center flex-col">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                    user.role === "admin" ? "bg-red-500" : "bg-blue-500"
-                  }`}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-black text-sm font-medium"
                 >
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <button
                   onClick={toggleRecording}
-                  className={`flex items-center w-full mt-3 p-1.5 rounded-lg hover:bg-gray-100 transition-colors ${
-                    isRecording ? "text-red-600 bg-red-50" : "text-blue-600 bg-blue-50"
+                  className={`flex items-center w-full mt-3 p-1.5 rounded-lg border border-zinc-700 hover:bg-zinc-900 transition-colors ${
+                    isRecording ? "text-white" : "text-zinc-300"
                   } ${isCollapsed ? "justify-center" : ""}`}
                   title={isCollapsed ? "AI Assistant" : ""}
                 >
@@ -308,6 +375,84 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {pathname.startsWith("/notes") && !isCollapsed && (
+          <div className="p-3 border-b border-zinc-800 space-y-2">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+              Sidebar Filters
+            </p>
+
+            <select
+              value={searchParams.get("workflowStatus") || ""}
+              onChange={(event) => updateNotesFilters({ workflowStatus: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            >
+              <option value="">Any Workflow Stage</option>
+              <option value="backlog">Backlog</option>
+              <option value="in_progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+
+            <select
+              value={searchParams.get("visibility") || ""}
+              onChange={(event) => updateNotesFilters({ visibility: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            >
+              <option value="">Any Visibility</option>
+              <option value="org">Organization</option>
+              <option value="private">Private</option>
+            </select>
+
+            <select
+              value={searchParams.get("completed") || ""}
+              onChange={(event) => updateNotesFilters({ completed: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            >
+              <option value="">Any Completion</option>
+              <option value="false">Pending</option>
+              <option value="true">Completed</option>
+            </select>
+
+            <select
+              value={searchParams.get("prioritize") || ""}
+              onChange={(event) => updateNotesFilters({ prioritize: event.target.value })}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+            >
+              <option value="">Any Priority</option>
+              <option value="true">High Priority</option>
+              <option value="false">Normal Priority</option>
+            </select>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={assigneeFilterInput}
+                onChange={(event) => setAssigneeFilterInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    applyAssigneeFilter();
+                  }
+                }}
+                placeholder="Assignee name or email"
+                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-200"
+              />
+              <button
+                onClick={applyAssigneeFilter}
+                className="rounded-lg border border-zinc-600 bg-black px-2 py-2 text-[11px] text-zinc-200"
+              >
+                Apply
+              </button>
+            </div>
+
+            <button
+              onClick={clearSidebarFilters}
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-xs text-zinc-300 hover:bg-zinc-900"
+            >
+              Clear Sidebar Filters
+            </button>
           </div>
         )}
 
@@ -320,10 +465,10 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`relative flex items-center p-3 rounded-lg hover:bg-gray-100 transition-colors ${
+                    className={`relative flex items-center p-3 rounded-lg hover:bg-zinc-900 transition-colors ${
                       pathname === item.href
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-gray-700"
+                        ? "bg-white text-black"
+                        : "text-zinc-300"
                     }`}
                     title={isCollapsed ? item.label : ""}
                   >
@@ -347,10 +492,10 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
         {/* Logout Button */}
         {user && !loading && (
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-zinc-800">
             <button
               onClick={handleLogout}
-              className={`flex items-center w-full p-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors ${
+              className={`flex items-center w-full p-3 rounded-lg border border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-900 transition-colors ${
                 isCollapsed ? "justify-center" : ""
               }`}
               title={isCollapsed ? "Logout" : ""}
@@ -360,20 +505,21 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
             </button>
           </div>
         )}
+
       </div>
 
       {/* Live Transcription Box */}
       {showTranscriptionBox && (isRecording || isGenerating) && (
-          <div className="fixed bottom-4 right-4 bg-white border border-gray-300 p-4 rounded-lg shadow-lg max-w-md z-50 max-h-64 overflow-y-auto">
+          <div className="fixed bottom-4 right-4 bg-black border border-zinc-700 p-4 rounded-lg shadow-lg max-w-md z-50 max-h-64 overflow-y-auto">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-gray-800 flex items-center">
-                <Bot size={16} className="mr-2 text-blue-600" />
+              <h3 className="font-semibold text-white flex items-center">
+                <Bot size={16} className="mr-2 text-white" />
                 AI Voice Notes
               </h3>
               {!isGenerating && (
                 <button
                   onClick={() => setShowTranscriptionBox(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-zinc-400 hover:text-white"
                 >
                   <X size={16} />
                 </button>
@@ -383,15 +529,15 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               {isRecording && (
                 <>
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs text-red-600 font-medium">Recording...</span>
+                    <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                    <span className="text-xs text-zinc-200 font-medium">Recording...</span>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3 min-h-[60px] max-h-[120px] overflow-y-auto">
-                    <p className="text-sm text-gray-700">
+                  <div className="bg-zinc-950 border border-zinc-700 rounded-lg p-3 min-h-[60px] max-h-[120px] overflow-y-auto">
+                    <p className="text-sm text-zinc-200">
                       {transcribedText || "Speak naturally to create notes..."}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-zinc-400">
                     The AI will automatically generate notes when you stop recording.
                   </p>
                 </>
@@ -399,15 +545,15 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               {isGenerating && (
                 <>
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-xs text-blue-600 font-medium">Generating notes...</span>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs text-zinc-200 font-medium">Generating notes...</span>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-3 min-h-[60px] max-h-[120px] overflow-y-auto">
-                    <p className="text-sm text-gray-700">
+                  <div className="bg-zinc-950 border border-zinc-700 rounded-lg p-3 min-h-[60px] max-h-[120px] overflow-y-auto">
+                    <p className="text-sm text-zinc-200">
                       &ldquo;{transcribedText}&rdquo;
                     </p>
                   </div>
-                  <p className="text-xs text-blue-500">
+                  <p className="text-xs text-zinc-400">
                     AI is analyzing your speech and creating structured notes...
                   </p>
                 </>

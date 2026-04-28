@@ -1,7 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '../../../../lib/mongodb'
 import Note from '../../../../models/Note'
+import User from '../../../../models/User'
 import { verifyToken } from '../../../../lib/auth'
+import { getNoteDeleteScope, getNoteReadScope, getNoteUpdateScope } from '@/lib/rbac'
+
+type UserEmailLookup = {
+  email?: string
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function scopedQuery(noteId: string, scope: Record<string, unknown>) {
+  if (Object.keys(scope).length === 0) {
+    return { _id: noteId }
+  }
+
+  return {
+    $and: [
+      { _id: noteId },
+      scope,
+    ],
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -21,11 +44,9 @@ export async function GET(
     await connectDB()
 
     const { noteId } = await params
+    const readScope = getNoteReadScope(payload)
 
-    const note = await Note.findOne({
-      _id: noteId,
-      createdby: payload.email
-    })
+    const note = await Note.findOne(scopedQuery(noteId, readScope))
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })
@@ -56,15 +77,28 @@ export async function PUT(
     await connectDB()
 
     const { noteId } = await params
+    const updateScope = getNoteUpdateScope(payload)
+
+    if (!updateScope) {
+      return NextResponse.json({ error: 'Role is not allowed to update notes' }, { status: 403 })
+    }
 
     const body = await request.json()
-    const { title, description, deadline, completed, prioritize, type, tags } = body
+    const {
+      title,
+      description,
+      deadline,
+      completed,
+      prioritize,
+      type,
+      tags,
+      workflowStatus,
+      visibility,
+      assignedTo,
+    } = body
 
     // Fetch existing note to get current values
-    const existingNote = await Note.findOne({
-      _id: noteId,
-      createdby: payload.email
-    })
+    const existingNote = await Note.findOne(scopedQuery(noteId, updateScope))
 
     if (!existingNote) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })
@@ -80,6 +114,14 @@ export async function PUT(
 
     if (!['work', 'personal'].includes(finalType)) {
       return NextResponse.json({ error: 'Type must be work or personal' }, { status: 400 })
+    }
+
+    if (workflowStatus && !['backlog', 'in_progress', 'review', 'done'].includes(workflowStatus)) {
+      return NextResponse.json({ error: 'Invalid workflow status' }, { status: 400 })
+    }
+
+    if (visibility && !['org', 'private'].includes(visibility)) {
+      return NextResponse.json({ error: 'Invalid visibility' }, { status: 400 })
     }
 
     const updateData: Record<string, unknown> = {
@@ -104,8 +146,37 @@ export async function PUT(
       updateData.tags = tags.map((tag: string) => tag.trim().toLowerCase()).filter((tag: string) => tag)
     }
 
+    if (workflowStatus !== undefined) {
+      updateData.workflowStatus = workflowStatus
+    }
+
+    if (visibility !== undefined) {
+      updateData.visibility = visibility
+    }
+
+    if (assignedTo !== undefined) {
+      const normalizedAssignee = String(assignedTo || '').trim()
+
+      if (!normalizedAssignee) {
+        updateData.assignedTo = undefined
+      } else if (normalizedAssignee.includes('@')) {
+        updateData.assignedTo = normalizedAssignee.toLowerCase()
+      } else {
+        const exactNameRegex = new RegExp(`^${escapeRegex(normalizedAssignee)}$`, 'i')
+        const matchedUser = await User.findOne<UserEmailLookup>({ name: { $regex: exactNameRegex } })
+          .select('email')
+          .lean()
+
+        if (!matchedUser?.email) {
+          return NextResponse.json({ error: 'Assigned user name not found' }, { status: 400 })
+        }
+
+        updateData.assignedTo = String(matchedUser.email).toLowerCase()
+      }
+    }
+
     const note = await Note.findOneAndUpdate(
-      { _id: noteId, createdby: payload.email },
+      scopedQuery(noteId, updateScope),
       updateData,
       { new: true }
     )
@@ -139,11 +210,13 @@ export async function DELETE(
     await connectDB()
 
     const { noteId } = await params
+    const deleteScope = getNoteDeleteScope(payload)
 
-    const note = await Note.findOneAndDelete({
-      _id: noteId,
-      createdby: payload.email
-    })
+    if (!deleteScope) {
+      return NextResponse.json({ error: 'Role is not allowed to delete notes' }, { status: 403 })
+    }
+
+    const note = await Note.findOneAndDelete(scopedQuery(noteId, deleteScope))
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })

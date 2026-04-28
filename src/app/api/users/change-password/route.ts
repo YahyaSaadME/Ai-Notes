@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = verifyToken(token)
-    if (!payload || payload.role !== 'user') {
+    if (!payload || !payload.userId) {
       return NextResponse.json({ error: 'User access required' }, { status: 403 })
     }
 

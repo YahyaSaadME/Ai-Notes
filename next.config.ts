@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
+
   // Transpile leaflet to handle it properly
   transpilePackages: ['leaflet'],
   

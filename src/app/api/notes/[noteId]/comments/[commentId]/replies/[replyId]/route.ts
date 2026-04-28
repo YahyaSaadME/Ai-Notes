@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import connectDB from '../../../../../../../../lib/mongodb'
 import Note from '../../../../../../../../models/Note'
 import { verifyToken } from '../../../../../../../../lib/auth'
+import { getNoteUpdateScope } from '@/lib/rbac'
+
+function scopedQuery(noteId: string, scope: Record<string, unknown>) {
+  if (Object.keys(scope).length === 0) {
+    return { _id: noteId }
+  }
+
+  return {
+    $and: [
+      { _id: noteId },
+      scope,
+    ],
+  }
+}
 
 export async function PUT(
   request: NextRequest,
@@ -21,15 +35,17 @@ export async function PUT(
     await connectDB()
 
     const { noteId, commentId, replyId } = await params
+    const updateScope = getNoteUpdateScope(payload)
+
+    if (!updateScope) {
+      return NextResponse.json({ error: 'Role is not allowed to update replies' }, { status: 403 })
+    }
 
     const body = await request.json()
-    const { text, isPrivate } = body
+    const { text, isPrivate, privateUsers } = body
 
     // Check if note exists and belongs to user
-    const note = await Note.findOne({
-      _id: noteId,
-      createdby: payload.email
-    })
+    const note = await Note.findOne(scopedQuery(noteId, updateScope))
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })
@@ -63,6 +79,12 @@ export async function PUT(
       reply.isPrivate = isPrivate
     }
 
+    if (privateUsers !== undefined && Array.isArray(privateUsers)) {
+      reply.privateUsers = privateUsers
+        .map((user: string) => String(user).trim().toLowerCase())
+        .filter(Boolean)
+    }
+
     await note.save()
 
     return NextResponse.json(reply)
@@ -90,12 +112,14 @@ export async function DELETE(
     await connectDB()
 
     const { noteId, commentId, replyId } = await params
+    const updateScope = getNoteUpdateScope(payload)
+
+    if (!updateScope) {
+      return NextResponse.json({ error: 'Role is not allowed to delete replies' }, { status: 403 })
+    }
 
     // Check if note exists and belongs to user
-    const note = await Note.findOne({
-      _id: noteId,
-      createdby: payload.email
-    })
+    const note = await Note.findOne(scopedQuery(noteId, updateScope))
 
     if (!note) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })

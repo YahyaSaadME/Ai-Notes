@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { normalizeRole, verifyToken } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    if (payload.role === 'admin') {
+    if (payload.role === 'admin' && !payload.userId) {
       return NextResponse.json({ 
         user: { 
           email: payload.email, 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         id: user._id, 
         email: user.email, 
         name: user.name, 
-        role: user.role 
+        role: normalizeRole(user.role) 
       }
     })
   } catch (error) {

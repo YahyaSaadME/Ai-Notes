@@ -2,24 +2,71 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, Filter, Calendar, Tag, MessageSquare, X, Edit, Trash2, Send, ChevronDown, ChevronRight } from 'lucide-react';
 
+interface MockReply {
+  id: number
+  content: string
+  createdAt: string
+}
+
+interface MockComment {
+  id: number
+  noteId: number
+  content: string
+  createdAt: string
+  replies: MockReply[]
+}
+
+interface MockNote {
+  id: number
+  title: string
+  description: string
+  type: 'work' | 'personal'
+  completed: boolean
+  prioritize: boolean
+  deadline: string
+  tags: string[]
+  createdAt: string
+}
+
+interface MockFilters {
+  type: string
+  completed: string
+  prioritize: string
+  sortBy: string
+  sortOrder: string
+}
+
+interface MockExpandedComments {
+  [key: number]: boolean
+}
+
+interface MockNewNote {
+  title: string
+  description: string
+  type: 'work' | 'personal'
+  deadline: string
+  tags: string
+  prioritize: boolean
+}
+
 const NotesApp = () => {
-  const [notes, setNotes] = useState([]);
-  const [filteredNotes, setFilteredNotes] = useState([]);
-  const [selectedNote, setSelectedNote] = useState(null);
+  const [notes, setNotes] = useState<MockNote[]>([]);
+  const [filteredNotes, setFilteredNotes] = useState<MockNote[]>([]);
+  const [selectedNote, setSelectedNote] = useState<MockNote | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<MockFilters>({
     type: '',
     completed: '',
     prioritize: '',
     sortBy: 'createdAt',
     sortOrder: 'desc'
   });
-  const [comments, setComments] = useState([]);
+  const [comments, setComments] = useState<MockComment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [expandedComments, setExpandedComments] = useState({});
-  const [newNote, setNewNote] = useState({
+  const [expandedComments, setExpandedComments] = useState<MockExpandedComments>({});
+  const [newNote, setNewNote] = useState<MockNewNote>({
     title: '',
     description: '',
     type: 'personal',
@@ -29,7 +76,7 @@ const NotesApp = () => {
   });
 
   // Mock data for demonstration
-  const mockNotes = [
+  const mockNotes: MockNote[] = [
     {
       id: 1,
       title: "Project Planning Meeting",
@@ -76,7 +123,7 @@ const NotesApp = () => {
     }
   ];
 
-  const mockComments = [
+  const mockComments: MockComment[] = [
     {
       id: 1,
       noteId: 1,
@@ -162,7 +209,7 @@ const NotesApp = () => {
     setFilteredNotes(filtered);
   };
 
-  const openNoteModal = (note) => {
+  const openNoteModal = (note: MockNote) => {
     setSelectedNote(note);
     setIsModalOpen(true);
     // Load comments for this note
@@ -207,7 +254,7 @@ const NotesApp = () => {
   };
 
   const handleAddComment = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !selectedNote) return;
     
     const comment = {
       id: Date.now(),
@@ -221,14 +268,14 @@ const NotesApp = () => {
     setNewComment('');
   };
 
-  const toggleCommentExpansion = (commentId) => {
+  const toggleCommentExpansion = (commentId: number) => {
     setExpandedComments(prev => ({
       ...prev,
       [commentId]: !prev[commentId]
     }));
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -237,11 +284,11 @@ const NotesApp = () => {
     });
   };
 
-  const isDeadlineNear = (deadline) => {
+  const isDeadlineNear = (deadline: string) => {
     if (!deadline) return false;
     const today = new Date();
     const deadlineDate = new Date(deadline);
-    const diffTime = deadlineDate - today;
+    const diffTime = deadlineDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays <= 3 && diffDays >= 0;
   };
@@ -538,7 +585,12 @@ const NotesApp = () => {
               <div className="grid grid-cols-2 gap-4">
                 <select
                   value={newNote.type}
-                  onChange={(e) => setNewNote(prev => ({ ...prev, type: e.target.value }))}
+                  onChange={(e) =>
+                    setNewNote(prev => ({
+                      ...prev,
+                      type: e.target.value as MockNewNote['type'],
+                    }))
+                  }
                   className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                 >
                   <option value="personal">Personal</option>
